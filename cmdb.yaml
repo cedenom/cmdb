@@ -10,6 +10,8 @@ metadata:
   namespace: mi-proyecto-nginx
   annotations:
     kubernetes.io/change-cause: "imagen nginx:latest"
+    # OPCIONAL: Enlace directo a Grafana desde el botón de Argo CD
+    argocd.argoproj.io/dashboard-url: "http://localhost:3000/d/15757"
   labels:
     app: mi-deployment
 spec:
@@ -28,21 +30,19 @@ spec:
         command: [ "sh", "-c", "echo \"Pod hostname: $(hostname)\" > /usr/share/nginx/html/index.html && nginx -g 'daemon off;'" ]
         ports:
         - containerPort: 80
+          name: http-web # Nombre para que Prometheus lo identifique
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: custom-node-port-service
   namespace: mi-proyecto-nginx
-  annotations:
-    prometheus.io/scrape: "true"   # <--- Esto le da permiso
-    prometheus.io/port: "80"       # <--- El puerto donde está nginx
 spec:
   type: NodePort
   selector:
     app: back
   ports:
-    - name: http-web
+    - name: http-web # DEBE coincidir con el ServiceMonitor
       protocol: TCP
       port: 8080
       targetPort: 80
@@ -52,13 +52,13 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: nginx-monitor
-  namespace: mi-proyecto-nginx # Donde está tu Nginx
+  namespace: mi-proyecto-nginx
   labels:
-    release: monitoring # IMPORTANTE: Este label debe coincidir con el de tu instalación de Prometheus
+    release: monitoring # Asegúrate de que este sea el label de tu Prometheus
 spec:
   selector:
     matchLabels:
-      app: back # Debe coincidir con el selector de tu Service
+      app: back
   endpoints:
-  - port: http-web # Es el nombre o número del puerto en tu Service
+  - port: http-web # Referencia al 'name' definido en el Service
     interval: 15s
