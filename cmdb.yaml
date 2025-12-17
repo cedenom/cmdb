@@ -11,7 +11,7 @@ metadata:
   annotations:
     kubernetes.io/change-cause: "imagen nginx:latest"
     # OPCIONAL: Enlace directo a Grafana desde el botón de Argo CD
-    argocd.argoproj.io/dashboard-url: "http://localhost:3000/d/15757"
+    argocd.argoproj.io/dashboard-url: "http://localhost:3000/goto/cf7ebaxh6sni8f?orgId=1"
   labels:
     app: mi-deployment
 spec:
