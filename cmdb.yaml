@@ -3,19 +3,17 @@ kind: Namespace
 metadata:
   name: mi-proyecto-nginx
 ---
-# --- DEPLOYMENT 1 (BACK) ---
+# --- DEPLOYMENT 1 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mi-primer-deployment
   namespace: mi-proyecto-nginx
-  labels:
-    app: back
 spec:
   replicas: 3
   selector:
     matchLabels:
-      app: back
+      app: back # El Service 1 buscará esta etiqueta
   template:
     metadata:
       labels:
@@ -24,43 +22,37 @@ spec:
       containers:
       - name: web
         image: nginx:latest
-        command: [ "sh", "-c", "echo \"Pod BACK: $(hostname)\" > /usr/share/nginx/html/index.html && nginx -g 'daemon off;'" ]
         ports:
         - containerPort: 80
           name: http-web
 ---
-# --- SERVICE 1 (BACK) ---
+# --- SERVICE 1 (Conecta con mi-primer-deployment) ---
 apiVersion: v1
 kind: Service
 metadata:
   name: service-back
   namespace: mi-proyecto-nginx
-  labels:
-    app: back # Etiqueta para que el ServiceMonitor lo encuentre
 spec:
   type: NodePort
   selector:
-    app: back
+    app: back # Coincide con el Deployment 1
   ports:
     - name: http-web
-      protocol: TCP
       port: 8080
       targetPort: 80
       nodePort: 30080
 ---
-# --- DEPLOYMENT 2 (FRONT) ---
+# --- DEPLOYMENT 2 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mi-segundo-deployment
   namespace: mi-proyecto-nginx
-  labels:
-    app: front
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: front
+      app: front # El Service 2 buscará esta etiqueta
   template:
     metadata:
       labels:
@@ -69,42 +61,22 @@ spec:
       containers:
       - name: web
         image: nginx:latest
-        command: [ "sh", "-c", "echo \"Pod FRONT: $(hostname)\" > /usr/share/nginx/html/index.html && nginx -g 'daemon off;'" ]
         ports:
         - containerPort: 80
           name: http-web
 ---
-# --- SERVICE 2 (FRONT) ---
+# --- SERVICE 2 (Conecta con mi-segundo-deployment) ---
 apiVersion: v1
 kind: Service
 metadata:
   name: service-front
   namespace: mi-proyecto-nginx
-  labels:
-    app: front # Etiqueta para que el ServiceMonitor lo encuentre
 spec:
   type: NodePort
   selector:
-    app: front
+    app: front # Coincide con el Deployment 2
   ports:
     - name: http-web
-      protocol: TCP
       port: 8081
       targetPort: 80
       nodePort: 30081
----
-# --- MONITORING (ServiceMonitors) ---
-apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
-metadata:
-  name: nginx-monitor-all
-  namespace: mi-proyecto-nginx
-  labels:
-    release: monitoring
-spec:
-  selector:
-    matchExpressions:
-      - {key: app, operator: In, values: [back, front]} # Esto monitorea AMBOS servicios
-  endpoints:
-  - port: http-web
-    interval: 15s
