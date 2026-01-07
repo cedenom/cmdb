@@ -3,17 +3,14 @@ kind: Namespace
 metadata:
   name: mi-proyecto-nginx
 ---
+# --- DEPLOYMENT 1 (BACK) ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mi-primer-deployment
   namespace: mi-proyecto-nginx
-  annotations:
-    kubernetes.io/change-cause: "imagen nginx:latest"
-    # OPCIONAL: Enlace directo a Grafana desde el botón de Argo CD
-    argocd.argoproj.io/dashboard-url: "http://localhost:3000/goto/cf7ebaxh6sni8f?orgId=1"
   labels:
-    app: mi-deployment
+    app: back
 spec:
   replicas: 3
   selector:
@@ -27,38 +24,87 @@ spec:
       containers:
       - name: web
         image: nginx:latest
-        command: [ "sh", "-c", "echo \"Pod hostname: $(hostname)\" > /usr/share/nginx/html/index.html && nginx -g 'daemon off;'" ]
+        command: [ "sh", "-c", "echo \"Pod BACK: $(hostname)\" > /usr/share/nginx/html/index.html && nginx -g 'daemon off;'" ]
         ports:
         - containerPort: 80
-          name: http-web # Nombre para que Prometheus lo identifique
+          name: http-web
 ---
+# --- SERVICE 1 (BACK) ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: custom-node-port-service
+  name: service-back
   namespace: mi-proyecto-nginx
+  labels:
+    app: back # Etiqueta para que el ServiceMonitor lo encuentre
 spec:
   type: NodePort
   selector:
     app: back
   ports:
-    - name: http-web # DEBE coincidir con el ServiceMonitor #test Argos4
+    - name: http-web
       protocol: TCP
       port: 8080
       targetPort: 80
       nodePort: 30080
 ---
+# --- DEPLOYMENT 2 (FRONT) ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mi-segundo-deployment
+  namespace: mi-proyecto-nginx
+  labels:
+    app: front
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: front
+  template:
+    metadata:
+      labels:
+        app: front
+    spec:
+      containers:
+      - name: web
+        image: nginx:latest
+        command: [ "sh", "-c", "echo \"Pod FRONT: $(hostname)\" > /usr/share/nginx/html/index.html && nginx -g 'daemon off;'" ]
+        ports:
+        - containerPort: 80
+          name: http-web
+---
+# --- SERVICE 2 (FRONT) ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-front
+  namespace: mi-proyecto-nginx
+  labels:
+    app: front # Etiqueta para que el ServiceMonitor lo encuentre
+spec:
+  type: NodePort
+  selector:
+    app: front
+  ports:
+    - name: http-web
+      protocol: TCP
+      port: 8081
+      targetPort: 80
+      nodePort: 30081
+---
+# --- MONITORING (ServiceMonitors) ---
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: nginx-monitor
+  name: nginx-monitor-all
   namespace: mi-proyecto-nginx
   labels:
-    release: monitoring # Asegúrate de que este sea el label de tu Prometheus
+    release: monitoring
 spec:
   selector:
-    matchLabels:
-      app: back
+    matchExpressions:
+      - {key: app, operator: In, values: [back, front]} # Esto monitorea AMBOS servicios
   endpoints:
-  - port: http-web # Referencia al 'name' definido en el Service
+  - port: http-web
     interval: 15s
