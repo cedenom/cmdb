@@ -3,7 +3,7 @@ kind: Namespace
 metadata:
   name: mi-proyecto-nginx
 ---
-# --- DEPLOYMENT BACK ---
+# --- DEPLOYMENT BACK (El que vamos a hacer fallar) ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -22,10 +22,19 @@ spec:
       containers:
       - name: web
         image: nginx:latest
-        command: [ "sh", "-c", "echo \"Pod BACK: $(hostname)\" > /usr/share/nginx/html/index.html && nginx -g 'daemon off;'" ]
+        # Creamos el archivo 'healthy' al iniciar
+        command: [ "sh", "-c", "touch /tmp/healthy && echo \"Pod BACK: $(hostname)\" > /usr/share/nginx/html/index.html && nginx -g 'daemon off;'" ]
         ports:
         - containerPort: 80
           name: http-web
+        # Esta sonda controla si el Pod está "Ready" en Argo CD
+        readinessProbe:
+          exec:
+            command:
+            - cat
+            - /tmp/healthy
+          initialDelaySeconds: 5
+          periodSeconds: 5
 ---
 # --- SERVICE BACK ---
 apiVersion: v1
