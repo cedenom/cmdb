@@ -3,7 +3,7 @@ kind: Namespace
 metadata:
   name: mi-proyecto-nginx
 ---
-# --- DEPLOYMENT BACK (El que vamos a hacer fallar) ---
+# --- DEPLOYMENT BACK (Con más recursos para pruebas de estrés) ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -22,12 +22,17 @@ spec:
       containers:
       - name: web
         image: nginx:latest
-        # Creamos el archivo 'healthy' al iniciar
         command: [ "sh", "-c", "touch /tmp/healthy && echo \"Pod BACK: $(hostname)\" > /usr/share/nginx/html/index.html && nginx -g 'daemon off;'" ]
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "200m"
+          limits:
+            memory: "256Mi" # Si el proceso falla por memoria, aquí verás el OOMKilled
+            cpu: "500m"
         ports:
         - containerPort: 80
           name: http-web
-        # Esta sonda controla si el Pod está "Ready" en Argo CD
         readinessProbe:
           exec:
             command:
@@ -52,7 +57,7 @@ spec:
       targetPort: 80
       nodePort: 30080
 ---
-# --- DEPLOYMENT FRONT ---
+# --- DEPLOYMENT FRONT (Recursos balanceados) ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -72,6 +77,13 @@ spec:
       - name: web
         image: nginx:latest
         command: [ "sh", "-c", "echo \"Pod FRONT: $(hostname)\" > /usr/share/nginx/html/index.html && nginx -g 'daemon off;'" ]
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "128Mi"
+            cpu: "300m"
         ports:
         - containerPort: 80
           name: http-web
@@ -91,3 +103,34 @@ spec:
       port: 80
       targetPort: 80
       nodePort: 30081
+---
+# --- DEPLOYMENT PRUEBA (Recursos mínimos) ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mi-primero-prueba
+  namespace: mi-proyecto-nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prueba
+  template:
+    metadata:
+      labels:
+        app: prueba
+    spec:
+      containers:
+      - name: web
+        image: nginx:latest
+        command: [ "sh", "-c", "echo \"Pod PRUEBA: $(hostname)\" > /usr/share/nginx/html/index.html && nginx -g 'daemon off;'" ]
+        resources:
+          requests:
+            memory: "32Mi"
+            cpu: "50m"
+          limits:
+            memory: "64Mi"
+            cpu: "100m"
+        ports:
+        - containerPort: 80
+          name: http-web
